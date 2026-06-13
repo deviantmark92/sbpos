@@ -211,21 +211,26 @@ require __DIR__ . '/../includes/header.php';
           </span>
         </div>
       </div>
-      <div class="actions">
-        <a href="<?= e(url('products', ['action' => 'edit', 'id' => $p['id']])) ?>" style="text-decoration:none;flex:1">
-          <md-outlined-button style="width:100%">Edit</md-outlined-button>
+      <div class=”actions”>
+        <a href=”<?= e(url('products', ['action' => 'edit', 'id' => $p['id']])) ?>” style=”text-decoration:none;flex:1”>
+          <md-outlined-button style=”width:100%”>Edit</md-outlined-button>
         </a>
-        <form method=”post” action=”<?= e(url('products')) ?>” autocomplete=”off” onsubmit=”return confirm('Delete “<?= e($p['name']) ?>”?')”>
+        <form method=”post” action=”<?= e(url('products')) ?>” autocomplete=”off” style=”margin:0;padding:0;display:flex”>
           <?= csrf_field() ?>
-          <input type="hidden" name="do" value="delete">
-          <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-          <md-text-button type="submit" onclick="this.closest('form').requestSubmit()">
-            <span class="material-symbols-outlined" style="color:var(--bad)">delete</span>
-          </md-text-button>
+          
         </form>
       </div>
     </div>
   <?php endforeach; ?>
 </div>
 <?php endif; ?>
+<script>
+document.querySelectorAll('.btn-delete-item').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    if (confirm(this.dataset.confirm)) {
+      this.closest('form').submit();
+    }
+  });
+});
+</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
