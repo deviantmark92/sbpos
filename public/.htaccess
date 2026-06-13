@@ -1,0 +1,14 @@
+# Send the bare folder to the front controller
+DirectoryIndex index.php
+
+# Optional pretty routing: index.php?page=foo  (kept simple; query strings work as-is)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # If the request is not a real file or directory, hand it to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Don't allow listing the uploads directory
+Options -Indexes
