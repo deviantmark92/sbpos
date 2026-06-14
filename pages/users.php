@@ -102,7 +102,7 @@ if ($action === 'new' || $action === 'edit') {
         </div>
       </div>
       <div class="form-actions">
-        <md-filled-button type="submit" has-icon onclick="this.closest('form').requestSubmit()">
+        <md-filled-button type="button" has-icon onclick="if(confirm('Save changes to this user?')) this.closest('form').submit()">
           <span class="material-symbols-outlined" slot="icon">save</span> Save</md-filled-button>
         <a href="<?= e(url('users')) ?>" style="text-decoration:none"><md-outlined-button>Cancel</md-outlined-button></a>
       </div>
@@ -143,9 +143,10 @@ require __DIR__ . '/../includes/header.php';
                 <?= csrf_field() ?><input type="hidden" name="do" value="toggle"><input type="hidden" name="id" value="<?= $u['id'] ?>">
                 <button type="submit" class="plain" style="border:none;background:none;cursor:pointer;color:var(--brown)"><?= $u['is_active']?'Disable':'Enable' ?></button>
               </form>
-              <form method="post" action="<?= e(url('users')) ?>" style="display:inline" autocomplete="off" onsubmit="return confirm('Delete this user?')">
+              <form method="post" action="<?= e(url('users')) ?>" style="display:inline" autocomplete="off">
                 <?= csrf_field() ?><input type="hidden" name="do" value="delete"><input type="hidden" name="id" value="<?= $u['id'] ?>">
-                <button type="submit" class="plain" style="border:none;background:none;cursor:pointer;color:var(--bad)">Delete</button>
+                <button type="button" class="plain" style="border:none;background:none;cursor:pointer;color:var(--bad)"
+                  onclick="if(confirm('Delete user &quot;<?= e($u['username']) ?>&quot;? This cannot be undone.')) this.closest('form').submit()">Delete</button>
               </form>
             <?php endif; ?>
           </div>

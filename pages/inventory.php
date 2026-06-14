@@ -92,7 +92,8 @@ require __DIR__ . '/../includes/header.php';
             <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
             <input type="number" name="stock_quantity" value="<?= (int) $p['stock_quantity'] ?>" min="0" style="width:64px;padding:6px;border:1px solid var(--line);border-radius:8px" title="Stock">
             <input type="number" name="low_stock_threshold" value="<?= (int) $p['low_stock_threshold'] ?>" min="0" style="width:64px;padding:6px;border:1px solid var(--line);border-radius:8px" title="Reorder at">
-            <button type="submit" style="border:none;background:var(--brown);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer">Save</button>
+            <button type="button" style="border:none;background:var(--brown);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer"
+              onclick="if(confirm('Save stock changes for &quot;<?= e($p['name']) ?>&quot;?')) this.closest('form').submit()">Save</button>
           </form>
         </td>
         <td>

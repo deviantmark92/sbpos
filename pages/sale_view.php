@@ -76,7 +76,7 @@ require __DIR__ . '/../includes/header.php';
     <form method="post" action="<?= e(url('sale_view', ['id' => $id])) ?>" class="form-actions" autocomplete="off">
       <?= csrf_field() ?>
       <input type="hidden" name="payment_status" value="paid">
-      <md-filled-button type="submit" has-icon onclick="this.closest('form').requestSubmit()">
+      <md-filled-button type="button" has-icon onclick="if(confirm('Mark this sale as paid?')) this.closest('form').submit()">
         <span class="material-symbols-outlined" slot="icon">paid</span> Mark as Paid
       </md-filled-button>
     </form>
@@ -84,7 +84,7 @@ require __DIR__ . '/../includes/header.php';
     <form method="post" action="<?= e(url('sale_view', ['id' => $id])) ?>" class="form-actions" autocomplete="off">
       <?= csrf_field() ?>
       <input type="hidden" name="payment_status" value="pending">
-      <md-outlined-button type="submit" onclick="this.closest('form').requestSubmit()">Revert to Pending</md-outlined-button>
+      <md-outlined-button type="button" onclick="if(confirm('Revert this sale to pending?')) this.closest('form').submit()">Revert to Pending</md-outlined-button>
     </form>
   <?php endif; ?>
 </div>

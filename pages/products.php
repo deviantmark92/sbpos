@@ -137,7 +137,7 @@ if ($action === 'new' || $action === 'edit') {
         </div>
       </div>
       <div class="form-actions">
-        <md-filled-button type="submit" has-icon onclick="this.closest('form').requestSubmit()">
+        <md-filled-button type="button" has-icon onclick="if(confirm('Save changes to this menu item?')) this.closest('form').submit()">
           <span class="material-symbols-outlined" slot="icon">save</span> Save
         </md-filled-button>
         <a href="<?= e(url('products')) ?>" style="text-decoration:none">
@@ -191,7 +191,23 @@ require __DIR__ . '/../includes/header.php';
         <?php if (!empty($p['photo_path'])): ?>
           <img src="<?= e($p['photo_path']) ?>" alt="<?= e($p['name']) ?>">
         <?php else: ?>
-          <span class="material-symbols-outlined">lunch_dining</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52" aria-hidden="true" style="color:var(--md-sys-color-outline)">
+            <path d="M74,44 Q88,28 90,40 Q83,46 75,50 Z" fill="#b05a00"/>
+            <path d="M75,52 Q92,44 91,57 Q84,59 75,57 Z" fill="#c06810"/>
+            <ellipse cx="48" cy="65" rx="28" ry="22" fill="currentColor"/>
+            <ellipse cx="44" cy="68" rx="18" ry="11" fill="#6b2c00"/>
+            <ellipse cx="24" cy="51" rx="10" ry="14" fill="currentColor"/>
+            <circle cx="22" cy="34" r="15" fill="currentColor"/>
+            <path d="M15,21 Q17,12 20,20 Q22,12 25,20 Q27,12 30,21" fill="#d63b2f"/>
+            <ellipse cx="13" cy="41" rx="5" ry="7" fill="#d63b2f"/>
+            <path d="M5,33 L18,30 L18,37 Z" fill="#e8a020"/>
+            <circle cx="24" cy="30" r="4" fill="#1a0800"/>
+            <circle cx="23" cy="29" r="1.5" fill="white"/>
+            <rect x="38" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
+            <rect x="52" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
+            <path d="M35,94 L47,94 M41,94 L41,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
+            <path d="M49,94 L61,94 M55,94 L55,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
+          </svg>
         <?php endif; ?>
       </div>
       <div class="body">

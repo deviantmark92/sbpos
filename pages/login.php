@@ -82,7 +82,7 @@ $pageTitle = 'Sign in';
           value="<?= e(input('username')) ?>" autocomplete="off">
         <span class="material-symbols-outlined" slot="leading-icon">person</span>
       </md-outlined-text-field>
-      <md-outlined-text-field label="Password" name="password" type="password" required>
+      <md-outlined-text-field label="Password" name="password" type="password" required autocomplete="new-password">
         <span class="material-symbols-outlined" slot="leading-icon">lock</span>
       </md-outlined-text-field>
       <md-filled-button type="submit" has-icon>
@@ -99,9 +99,14 @@ $pageTitle = 'Sign in';
   </div>
 </div>
 <script>
-  // Native form submit from a Material button
+  const form = document.querySelector('form');
+  // Submit on button click
   document.querySelector('md-filled-button[type=submit]')
-    ?.addEventListener('click', () => document.querySelector('form').requestSubmit());
+    ?.addEventListener('click', () => form.requestSubmit());
+  // Submit on Enter key inside Material text fields
+  form.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+  });
 </script>
 </body>
 </html>

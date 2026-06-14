@@ -119,7 +119,7 @@ require __DIR__ . '/../includes/header.php';
     <h3>Current Order</h3>
     <form method="post" action="<?= e(url('sales')) ?>" id="saleForm" autocomplete="off">
       <?= csrf_field() ?>
-      <md-outlined-text-field label="Customer name" name="customer_name" placeholder="Walk-in" style="margin-bottom:12px"></md-outlined-text-field>
+      <md-outlined-text-field label="Customer label" name="customer_name" placeholder="Walk-in" style="margin-bottom:12px"></md-outlined-text-field>
 
       <ul class="cart-list" id="cartList">
         <li class="empty" id="cartEmpty"><span class="material-symbols-outlined">shopping_cart</span><br>No items yet</li>

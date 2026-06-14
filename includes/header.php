@@ -45,7 +45,23 @@ $nav = [
   <label for="nav-toggle" class="icon-btn menu-btn" title="Menu">
     <span class="material-symbols-outlined">menu</span>
   </label>
-  <span class="material-symbols-outlined brand-icon">lunch_dining</span>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true" style="flex-shrink:0">
+    <path d="M74,44 Q88,28 90,40 Q83,46 75,50 Z" fill="#b05a00"/>
+    <path d="M75,52 Q92,44 91,57 Q84,59 75,57 Z" fill="#c06810"/>
+    <ellipse cx="48" cy="65" rx="28" ry="22" fill="currentColor"/>
+    <ellipse cx="44" cy="68" rx="18" ry="11" fill="#6b2c00"/>
+    <ellipse cx="24" cy="51" rx="10" ry="14" fill="currentColor"/>
+    <circle cx="22" cy="34" r="15" fill="currentColor"/>
+    <path d="M15,21 Q17,12 20,20 Q22,12 25,20 Q27,12 30,21" fill="#d63b2f"/>
+    <ellipse cx="13" cy="41" rx="5" ry="7" fill="#d63b2f"/>
+    <path d="M5,33 L18,30 L18,37 Z" fill="#e8a020"/>
+    <circle cx="24" cy="30" r="4" fill="#1a0800"/>
+    <circle cx="23" cy="29" r="1.5" fill="white"/>
+    <rect x="38" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
+    <rect x="52" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
+    <path d="M35,94 L47,94 M41,94 L41,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
+    <path d="M49,94 L61,94 M55,94 L55,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
+  </svg>
   <h1 class="topbar-title"><?= e($cfg['app_name']) ?></h1>
   <div class="topbar-spacer"></div>
   <?php if ($user): ?>
@@ -56,7 +72,8 @@ $nav = [
         <small><?= e(ucfirst($user['role'])) ?></small>
       </span>
     </span>
-    <a class="icon-btn" href="<?= e(url('logout')) ?>" title="Log out">
+    <a class="icon-btn" href="<?= e(url('logout')) ?>" title="Log out"
+       onclick="return confirm('Are you sure you want to log out?')">
       <span class="material-symbols-outlined">logout</span>
     </a>
   <?php endif; ?>

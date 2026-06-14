@@ -6,6 +6,7 @@ if (!empty($GLOBALS['__forbidden'])) { require __DIR__ . '/_forbidden.php'; retu
 $pdo = db();
 
 $period = in_array(input('period'), ['day', 'month', 'year'], true) ? input('period') : 'day';
+$view   = input('view') === 'sales' ? 'sales' : 'summary';
 
 // Period-specific SQL fragments ($period is whitelisted above)
 $periodFilter = [
@@ -69,6 +70,23 @@ $inv = $pdo->query("
     FROM products WHERE is_active = TRUE
 ")->fetch();
 
+// Individual sales list (used when $view === 'sales')
+$salesList = [];
+if ($view === 'sales') {
+    $salesList = $pdo->query("
+        SELECT s.id, s.customer_name, s.total_amount, s.payment_status,
+               s.created_at, u.full_name AS cashier,
+               COUNT(si.id) AS item_count
+        FROM sales s
+        LEFT JOIN users u ON u.id = s.cashier_id
+        LEFT JOIN sale_items si ON si.sale_id = s.id
+        WHERE $sPeriodFilter
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT 200
+    ")->fetchAll();
+}
+
 $fmtBucket = function ($b) use ($period) {
     $t = strtotime($b);
     return $period === 'day' ? date('M j, Y', $t) : ($period === 'month' ? date('F Y', $t) : date('Y', $t));
@@ -82,16 +100,26 @@ require __DIR__ . '/../includes/header.php';
 <div class="page-head">
   <h2>Reports</h2>
   <div class="spacer"></div>
-  <div style="display:flex;gap:6px">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     <?php foreach (['day' => 'Daily', 'month' => 'Monthly', 'year' => 'Yearly'] as $k => $lab): ?>
-      <a href="<?= e(url('reports', ['period' => $k])) ?>" style="text-decoration:none">
+      <a href="<?= e(url('reports', ['view' => $view, 'period' => $k])) ?>" style="text-decoration:none">
         <?php if ($period === $k): ?><md-filled-button><?= $lab ?></md-filled-button>
         <?php else: ?><md-outlined-button><?= $lab ?></md-outlined-button><?php endif; ?>
       </a>
     <?php endforeach; ?>
+    <span style="display:inline-block;width:1px;height:28px;background:var(--line);margin:0 2px"></span>
+    <a href="<?= e(url('reports', ['view' => 'summary', 'period' => $period])) ?>" style="text-decoration:none">
+      <?php if ($view === 'summary'): ?><md-filled-button>Summary</md-filled-button>
+      <?php else: ?><md-outlined-button>Summary</md-outlined-button><?php endif; ?>
+    </a>
+    <a href="<?= e(url('reports', ['view' => 'sales', 'period' => $period])) ?>" style="text-decoration:none">
+      <?php if ($view === 'sales'): ?><md-filled-button>Sales List</md-filled-button>
+      <?php else: ?><md-outlined-button>Sales List</md-outlined-button><?php endif; ?>
+    </a>
   </div>
 </div>
 
+<?php if ($view === 'summary'): ?>
 <div class="stat-grid">
   <div class="card stat">
     <div class="label"><span class="material-symbols-outlined">payments</span> <?= $label ?> · Revenue (paid)</div>
@@ -152,4 +180,47 @@ require __DIR__ . '/../includes/header.php';
     </div>
   </div>
 </div>
+
+<?php else: /* sales list view */ ?>
+<div class="table-wrap">
+  <table class="data">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Cashier</th>
+        <th class="num">Items</th>
+        <th class="num">Total</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    <?php if (!$salesList): ?>
+      <tr><td colspan="8" class="muted" style="text-align:center;padding:24px">No sales recorded in this period.</td></tr>
+    <?php else: foreach ($salesList as $s): ?>
+      <tr>
+        <td class="muted">#<?= (int) $s['id'] ?></td>
+        <td>
+          <?= e(date('M j, Y', strtotime($s['created_at']))) ?><br>
+          <small class="muted"><?= e(date('g:i a', strtotime($s['created_at']))) ?></small>
+        </td>
+        <td><?= e($s['customer_name']) ?></td>
+        <td class="muted"><?= e($s['cashier'] ?? '—') ?></td>
+        <td class="num"><?= (int) $s['item_count'] ?></td>
+        <td class="num"><strong><?= money($s['total_amount']) ?></strong></td>
+        <td><span class="badge <?= e($s['payment_status']) ?>"><?= e(ucfirst($s['payment_status'])) ?></span></td>
+        <td>
+          <a href="<?= e(url('sale_view', ['id' => $s['id']])) ?>" style="text-decoration:none">
+            <md-outlined-button>View</md-outlined-button>
+          </a>
+        </td>
+      </tr>
+    <?php endforeach; endif; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php require __DIR__ . '/../includes/footer.php'; ?>
