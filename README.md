@@ -1,4 +1,4 @@
-# Broasted Chicken POS System
+# small business POS System (sbPOS)
 
 A simple, mobile-friendly **web-based Point of Sale** for a home-based fried chicken
 business. Tracks daily sales, manages a photo menu, monitors raw-material inventory,
