@@ -16,6 +16,21 @@ function money($amount): string
     return $cfg['currency_symbol'] . number_format((float) $amount, 2);
 }
 
+/**
+ * Suggest a selling price from a recipe cost and the chosen pricing mode.
+ *   percentage -> cost + markup% of cost
+ *   addon      -> cost + flat add-on
+ *   manual     -> null (owner sets the price directly)
+ */
+function suggest_price(float $cost, string $mode, float $markup): ?float
+{
+    return match ($mode) {
+        'percentage' => round($cost * (1 + $markup / 100), 2),
+        'addon'      => round($cost + $markup, 2),
+        default      => null,
+    };
+}
+
 /** Build a URL to a page within the front controller. */
 function url(string $page, array $params = []): string
 {

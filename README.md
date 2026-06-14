@@ -1,8 +1,9 @@
 # Broasted Chicken POS System
 
 A simple, mobile-friendly **web-based Point of Sale** for a home-based fried chicken
-business. Tracks daily sales, manages a photo menu, monitors inventory, flags low stock
-and pending payments, and produces daily / monthly / yearly reports.
+business. Tracks daily sales, manages a photo menu, monitors raw-material inventory,
+flags low stock and pending payments, and produces daily / monthly / yearly reports
+including profit derived from ingredient costs.
 
 - **Backend:** PHP (plain PHP + PDO, no framework)
 - **Database:** MySQL
@@ -15,14 +16,49 @@ and pending payments, and produces daily / monthly / yearly reports.
 
 | Module | What it does |
 |--------|--------------|
-| **Dashboard** | Today's sales, transaction count, pending payments, low-stock alerts |
-| **Sales (POS)** | Tap-to-add menu, live cart & total, customer name, paid/pending status, records the sale and decrements stock |
-| **Menu / Products** | Add, edit, delete, search items; upload a photo; set price, stock & reorder level *(Owner)* |
-| **Inventory** | Monitor stock, quick +/- adjustments, set exact stock & reorder thresholds *(Owner)* |
-| **Reports** | Daily / monthly / yearly revenue, pending totals, top sellers, stock value *(Owner)* |
+| **Dashboard** | Today's paid revenue, transaction count, pending-payment total, low-stock raw-material alerts |
+| **Sales (POS)** | Tap-to-add menu, live cart & total, "can make" counter per item, customer name, paid/pending status, optional note — records the sale and decrements ingredient stock |
+| **Menu / Products** | Add, edit, delete, search menu items; upload a photo; build a recipe from inventory items; set price via % markup, cost add-on, or manual entry *(Owner)* |
+| **Inventory** | Manage raw materials (ingredients): unit cost, stock, reorder threshold; quick ±1/+10 adjustments or set exact values; items used in recipes cannot be deleted *(Owner)* |
+| **Reports** | Daily / monthly / yearly revenue, profit (revenue − ingredient cost), pending totals, top sellers, stock value, sales list *(Owner)* |
 | **Users** | Create & manage Owner / Cashier accounts, enable/disable, reset passwords *(Owner)* |
 
-**Roles:** *Owner* has full access; *Cashier* can only process sales (per the project spec).
+**Roles:** *Owner* has full access; *Cashier* can only process sales.
+
+---
+
+## Product model
+
+The system uses a **two-level model** that separates raw materials from sellable items:
+
+```
+inventory_items  ──(recipe)──►  menu_items
+ (raw materials)                (what is sold)
+  unit cost ✓                    selling price ✓
+  stock tracked ✓                availability derived ✓
+```
+
+- **`inventory_items`** are the physical ingredients (chicken pieces, sauce cans, oil, etc.).
+  Each carries a `unit_cost` and a `stock_quantity`.
+- **`menu_items`** are what appears on the POS. Each has a recipe made up of one or more
+  inventory items and a quantity per portion.
+- **Availability** shown on the POS ("N can make") is `MIN(FLOOR(stock / qty_needed))`
+  across all ingredients in the recipe — the scarcest ingredient is the bottleneck.
+- **Selling a menu item decrements ingredient stock**, not a menu-item stock counter.
+- A menu item with no recipe cannot be sold.
+
+### Pricing modes
+
+When creating or editing a menu item the Owner chooses one of three pricing modes:
+
+| Mode | How price is derived |
+|------|----------------------|
+| **% markup** | `recipe_cost × (1 + markup / 100)` |
+| **Cost add-on** | `recipe_cost + flat peso amount` |
+| **Manual** | Owner enters the selling price directly |
+
+The price preview updates live in the browser as ingredients or the markup value change.
+The authoritative price is always resolved server-side on save.
 
 ---
 
@@ -77,14 +113,22 @@ is included for Apache.
 
 ---
 
-## Transaction flow (matches the project spec)
+## Transaction flow
 
-1. Cashier opens **New Sale**, enters the customer name, taps products and sets quantities.
-2. The cart shows each line, the running total, and the payment status.
-3. Cashier marks the sale **Paid** or **Pending**.
-4. On record, the system saves the transaction, decrements inventory, and shows the receipt.
-5. A **Pending** sale can later be marked **Paid** from its receipt page.
-6. The **Dashboard** surfaces pending payments and low-stock items.
+1. Cashier opens **New Sale**, enters the customer name, taps menu items (only those with
+   a recipe and sufficient ingredient stock are tappable), and sets quantities.
+2. The cart shows each line with the running total. A "can make" count on each tile
+   prevents over-ordering.
+3. Cashier selects **Paid** or **Pending** payment status and optionally adds a note.
+4. On submit the system:
+   - Validates that every ingredient has enough stock (row-locked in a DB transaction).
+   - Inserts the sale header and line items (with a cost snapshot for profit reporting).
+   - Decrements each ingredient's `stock_quantity` by `recipe_qty × item_qty`.
+   - Redirects to the **receipt page** (sale view).
+5. From the receipt page:
+   - A **Pending** sale can be marked **Paid**.
+   - A **Paid** sale can be reverted back to **Pending** ("Revert to Pending").
+6. The **Dashboard** surfaces all pending payments and raw-material low-stock alerts.
 
 ---
 
@@ -93,31 +137,55 @@ is included for Apache.
 ```
 Small Business POS/
 ├── config/
-│   └── config.php          # DB credentials + app settings (currency, uploads)
+│   └── config.php              # DB credentials + app settings (currency, uploads)
 ├── includes/
-│   ├── db.php              # PDO connection (MySQL)
-│   ├── auth.php            # login, sessions, Owner/Cashier guards
-│   ├── helpers.php         # money(), CSRF, flash messages, escaping
-│   ├── header.php          # layout + Material Web import + nav
+│   ├── db.php                  # PDO connection (MySQL)
+│   ├── auth.php                # login, sessions, Owner/Cashier guards
+│   ├── helpers.php             # money(), suggest_price(), CSRF, flash messages
+│   ├── header.php              # layout + Material Web import + nav
 │   └── footer.php
-├── pages/                  # one file per screen (routed by the front controller)
+├── pages/                      # one file per screen (routed by the front controller)
 │   ├── login.php  logout.php  dashboard.php
-│   ├── sales.php  sale_view.php
-│   ├── products.php  inventory.php  reports.php  users.php
+│   ├── sales.php              # POS screen — recipe-aware cart, ingredient deduction
+│   ├── sale_view.php          # receipt + paid/pending toggle (bidirectional)
+│   ├── products.php           # menu items with recipe builder and pricing modes
+│   ├── inventory.php          # raw materials — cost, stock, thresholds
+│   ├── reports.php            # revenue, profit, top sellers, sales list
+│   ├── users.php
 │   └── _forbidden.php
-├── public/                 # web root
-│   ├── index.php           # front controller  (index.php?page=...)
+├── public/                     # web root
+│   ├── index.php               # front controller  (index.php?page=...)
 │   ├── .htaccess
-│   ├── assets/app.css      # Material Design 3 styling
-│   └── uploads/            # menu photos saved here
+│   ├── assets/app.css          # Material Design 3 styling
+│   └── uploads/                # menu photos saved here
 └── sql/
-    ├── schema.sql          # tables: users, products, sales, sale_items
-    └── seed.sql            # sample menu, accounts, demo transactions
+    ├── schema.sql              # tables: users, inventory_items, menu_items,
+    │                           #         menu_item_ingredients, sales, sale_items
+    └── seed.sql                # sample inventory, menu, accounts, demo transactions
 ```
+
+---
+
+## Database schema overview
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Owner / Cashier accounts (bcrypt passwords) |
+| `inventory_items` | Raw materials — `unit_cost`, `stock_quantity`, `low_stock_threshold` |
+| `menu_items` | Sellable items — `pricing_mode`, `markup_value`, authoritative `price` |
+| `menu_item_ingredients` | Recipe rows linking a menu item to inventory items with a `quantity` |
+| `sales` | Transaction header — customer, cashier, total, `payment_status`, `paid_at` |
+| `sale_items` | Line items — name/price/cost snapshot at sale time for accurate profit queries |
+
+---
 
 ## Security notes
 
 - Passwords are stored as bcrypt hashes (`password_hash`).
 - All forms use CSRF tokens; all queries use prepared statements (PDO).
-- Stock is decremented inside a DB transaction with row locking to prevent overselling.
-- Set proper file permissions on `public/uploads/` and change the default logins before going live.
+- Ingredient stock is decremented inside a DB transaction with row locking (`FOR UPDATE`)
+  to prevent overselling under concurrent requests.
+- Inventory items referenced by a recipe cannot be deleted (FK `ON DELETE RESTRICT`);
+  the UI enforces this with an explicit pre-check and a user-friendly error message.
+- Set proper file permissions on `public/uploads/` and change the default logins before
+  going live.

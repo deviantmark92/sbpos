@@ -1,5 +1,5 @@
 <?php
-/** Sales transaction screen (Cashier + Owner). Build a cart, set payment status, record sale. */
+/** Sales transaction screen (Cashier + Owner). Build a cart of menu items, record sale, deduct inventory. */
 require_login();
 $pdo  = db();
 $user = current_user();
@@ -12,16 +12,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status   = input('payment_status') === 'paid' ? 'paid' : 'pending';
     $note     = trim((string) input('note'));
 
-    $productIds = $_POST['product_id'] ?? [];
+    $menuIds    = $_POST['menu_item_id'] ?? [];
     $quantities = $_POST['qty'] ?? [];
 
-    // Build a clean list of [id => qty]
+    // Build a clean list of [menu_item_id => qty]
     $cart = [];
-    foreach ($productIds as $i => $pid) {
-        $pid = (int) $pid;
+    foreach ($menuIds as $i => $mid) {
+        $mid = (int) $mid;
         $qty = (int) ($quantities[$i] ?? 0);
-        if ($pid > 0 && $qty > 0) {
-            $cart[$pid] = ($cart[$pid] ?? 0) + $qty;
+        if ($mid > 0 && $qty > 0) {
+            $cart[$mid] = ($cart[$mid] ?? 0) + $qty;
         }
     }
 
@@ -33,27 +33,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        // Lock the products we're selling and read current price/stock
+        // Load the menu items being sold
         $in   = implode(',', array_fill(0, count($cart), '?'));
-        $stmt = $pdo->prepare("SELECT id, name, price, stock_quantity FROM products WHERE id IN ($in) FOR UPDATE");
+        $stmt = $pdo->prepare("SELECT id, name, price, is_active FROM menu_items WHERE id IN ($in)");
         $stmt->execute(array_keys($cart));
-        $rows = [];
-        foreach ($stmt->fetchAll() as $r) { $rows[$r['id']] = $r; }
+        $menu = [];
+        foreach ($stmt->fetchAll() as $m) { $menu[(int) $m['id']] = $m; }
 
-        // Validate stock
-        $lineItems = [];
-        $total = 0;
-        foreach ($cart as $pid => $qty) {
-            if (!isset($rows[$pid])) {
+        // Load their recipes
+        $rstmt = $pdo->prepare("SELECT menu_item_id, inventory_item_id, quantity FROM menu_item_ingredients WHERE menu_item_id IN ($in)");
+        $rstmt->execute(array_keys($cart));
+        $recipes = [];                 // menu_id => [inv_id => qty]
+        $neededInv = [];               // inv_id => total units required across the cart
+        foreach ($rstmt->fetchAll() as $r) {
+            $mid = (int) $r['menu_item_id'];
+            $iid = (int) $r['inventory_item_id'];
+            $rq  = (int) $r['quantity'];
+            $recipes[$mid][$iid] = $rq;
+        }
+
+        // Validate menu items, accumulate inventory needs
+        foreach ($cart as $mid => $qty) {
+            if (!isset($menu[$mid])) {
                 throw new RuntimeException('A selected item no longer exists.');
             }
-            $p = $rows[$pid];
-            if ((int) $p['stock_quantity'] < $qty) {
-                throw new RuntimeException('Not enough stock for “' . $p['name'] . '” (only ' . $p['stock_quantity'] . ' left).');
+            if (!$menu[$mid]['is_active']) {
+                throw new RuntimeException('“' . $menu[$mid]['name'] . '” is no longer available.');
             }
-            $sub = round((float) $p['price'] * $qty, 2);
+            if (empty($recipes[$mid])) {
+                throw new RuntimeException('“' . $menu[$mid]['name'] . '” has no recipe and cannot be sold.');
+            }
+            foreach ($recipes[$mid] as $iid => $rq) {
+                $neededInv[$iid] = ($neededInv[$iid] ?? 0) + $rq * $qty;
+            }
+        }
+
+        // Lock and read the inventory items we will consume
+        $invIn   = implode(',', array_fill(0, count($neededInv), '?'));
+        $istmt   = $pdo->prepare("SELECT id, name, stock_quantity, unit_cost FROM inventory_items WHERE id IN ($invIn) FOR UPDATE");
+        $istmt->execute(array_keys($neededInv));
+        $inv = [];
+        foreach ($istmt->fetchAll() as $r) { $inv[(int) $r['id']] = $r; }
+
+        // Validate stock
+        foreach ($neededInv as $iid => $need) {
+            if (!isset($inv[$iid])) {
+                throw new RuntimeException('An ingredient no longer exists.');
+            }
+            if ((int) $inv[$iid]['stock_quantity'] < $need) {
+                throw new RuntimeException('Not enough “' . $inv[$iid]['name'] . '” in stock (need ' . $need . ', have ' . (int) $inv[$iid]['stock_quantity'] . ').');
+            }
+        }
+
+        // Build line items with cost snapshot
+        $lineItems = [];
+        $total = 0;
+        foreach ($cart as $mid => $qty) {
+            $unitPrice = (float) $menu[$mid]['price'];
+            $unitCost  = 0;
+            foreach ($recipes[$mid] as $iid => $rq) {
+                $unitCost += (float) $inv[$iid]['unit_cost'] * $rq;
+            }
+            $sub = round($unitPrice * $qty, 2);
             $total += $sub;
-            $lineItems[] = ['id' => $pid, 'name' => $p['name'], 'qty' => $qty, 'price' => $p['price'], 'sub' => $sub];
+            $lineItems[] = ['id' => $mid, 'name' => $menu[$mid]['name'], 'qty' => $qty,
+                            'price' => $unitPrice, 'cost' => round($unitCost, 2), 'sub' => $sub];
         }
 
         // Insert sale header
@@ -63,13 +107,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$customer, $user['id'], $total, $status, $note ?: null, $paidAt]);
         $saleId = (int) $pdo->lastInsertId();
 
-        // Insert line items + decrement stock
-        $itemStmt = $pdo->prepare('INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, subtotal)
-                                   VALUES (?,?,?,?,?,?)');
-        $stockStmt = $pdo->prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?');
+        // Insert line items
+        $itemStmt = $pdo->prepare('INSERT INTO sale_items (sale_id, menu_item_id, product_name, quantity, unit_price, unit_cost, subtotal)
+                                   VALUES (?,?,?,?,?,?,?)');
         foreach ($lineItems as $li) {
-            $itemStmt->execute([$saleId, $li['id'], $li['name'], $li['qty'], $li['price'], $li['sub']]);
-            $stockStmt->execute([$li['qty'], $li['id']]);
+            $itemStmt->execute([$saleId, $li['id'], $li['name'], $li['qty'], $li['price'], $li['cost'], $li['sub']]);
+        }
+
+        // Decrement inventory stock
+        $invStmt = $pdo->prepare('UPDATE inventory_items SET stock_quantity = stock_quantity - ?, updated_at=CURRENT_TIMESTAMP WHERE id = ?');
+        foreach ($neededInv as $iid => $need) {
+            $invStmt->execute([$need, $iid]);
         }
 
         $pdo->commit();
@@ -84,10 +132,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ---------------- Render POS screen ---------------- */
-$products = $pdo->query("SELECT id, name, category, price, stock_quantity
-                         FROM products
-                         WHERE is_active = TRUE
-                         ORDER BY category, name")->fetchAll();
+// Active menu items that have a recipe, with how many can be made from current stock.
+$products = $pdo->query("
+    SELECT m.id, m.name, m.category, m.price,
+           COUNT(mi.id)                                AS ingredient_count,
+           MIN(FLOOR(ii.stock_quantity / mi.quantity)) AS can_make
+    FROM menu_items m
+    JOIN menu_item_ingredients mi ON mi.menu_item_id = m.id
+    JOIN inventory_items ii       ON ii.id = mi.inventory_item_id
+    WHERE m.is_active = TRUE
+    GROUP BY m.id
+    ORDER BY m.category, m.name
+")->fetchAll();
 
 $activePage = 'sales';
 $pageTitle  = 'New Sale';
@@ -100,15 +156,15 @@ require __DIR__ . '/../includes/header.php';
   <div>
     <p class="hint">Tap an item to add it to the order.</p>
     <div class="pos-menu">
-      <?php foreach ($products as $p): $out = $p['stock_quantity'] <= 0; ?>
+      <?php foreach ($products as $p): $avail = (int) $p['can_make']; $out = $avail <= 0; ?>
         <button type="button" class="pos-item" <?= $out ? 'disabled' : '' ?>
           data-id="<?= (int) $p['id'] ?>"
           data-name="<?= e($p['name']) ?>"
           data-price="<?= e($p['price']) ?>"
-          data-stock="<?= (int) $p['stock_quantity'] ?>">
+          data-stock="<?= $avail ?>">
           <span class="nm"><?= e($p['name']) ?></span>
           <span class="pr"><?= money($p['price']) ?></span>
-          <span class="st"><?= $out ? 'Out of stock' : ((int) $p['stock_quantity'] . ' in stock') ?></span>
+          <span class="st"><?= $out ? 'Out of stock' : ($avail . ' can make') ?></span>
         </button>
       <?php endforeach; ?>
     </div>
@@ -176,7 +232,7 @@ function render(){
       <button type="button" class="rm" data-rm="${id}"><span class="material-symbols-outlined">close</span></button>`;
     list.appendChild(li);
     hidden.insertAdjacentHTML('beforeend',
-      `<input type="hidden" name="product_id[]" value="${id}"><input type="hidden" name="qty[]" value="${it.qty}">`);
+      `<input type="hidden" name="menu_item_id[]" value="${id}"><input type="hidden" name="qty[]" value="${it.qty}">`);
   }
   document.getElementById('cartTotal').textContent = fmt(total);
 }
@@ -186,7 +242,7 @@ function addItem(btn){
   const stock = parseInt(btn.dataset.stock,10);
   const cur = cart.get(id);
   const qty = cur ? cur.qty : 0;
-  if (qty + 1 > stock){ alert('Only ' + stock + ' in stock.'); return; }
+  if (qty + 1 > stock){ alert('Only ' + stock + ' can be made from current stock.'); return; }
   if (cur){ cur.qty++; }
   else { cart.set(id, {name:btn.dataset.name, price:parseFloat(btn.dataset.price), stock, qty:1}); }
   render();
@@ -196,7 +252,7 @@ document.querySelectorAll('.pos-item').forEach(b => b.addEventListener('click', 
 
 document.getElementById('cartList').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.inc){ const it=cart.get(t.dataset.inc); if(it.qty+1>it.stock){alert('Only '+it.stock+' in stock.');return;} it.qty++; }
+  if (t.dataset.inc){ const it=cart.get(t.dataset.inc); if(it.qty+1>it.stock){alert('Only '+it.stock+' can be made from current stock.');return;} it.qty++; }
   else if (t.dataset.dec){ const it=cart.get(t.dataset.dec); it.qty--; if(it.qty<=0) cart.delete(t.dataset.dec); }
   else if (t.dataset.rm){ cart.delete(t.dataset.rm); }
   render();
@@ -204,7 +260,7 @@ document.getElementById('cartList').addEventListener('click', e => {
 
 document.getElementById('recordBtn').addEventListener('click', () => {
   if (cart.size === 0){ alert('Add at least one item first.'); return; }
-  document.getElementById('saleForm').requestSubmit();
+  if (confirm('Record this sale?')) document.getElementById('saleForm').requestSubmit();
 });
 </script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

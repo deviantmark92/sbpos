@@ -21,10 +21,10 @@ $pending = $pdo->query("
 ")->fetchAll();
 $pendingTotal = array_sum(array_column($pending, 'total_amount'));
 
-// Low stock items
+// Low stock items (raw materials)
 $low = $pdo->query("
-    SELECT name, category, stock_quantity, low_stock_threshold
-    FROM products
+    SELECT name, category, unit, stock_quantity, low_stock_threshold
+    FROM inventory_items
     WHERE is_active = TRUE AND stock_quantity <= low_stock_threshold
     ORDER BY stock_quantity ASC
 ")->fetchAll();

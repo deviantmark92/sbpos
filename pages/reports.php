@@ -61,13 +61,21 @@ $top = $pdo->query("
     LIMIT 8
 ")->fetchAll();
 
-// Inventory report
+// Profit on paid sales in the current period (revenue - cost snapshot)
+$profit = $pdo->query("
+    SELECT COALESCE(SUM((si.unit_price - si.unit_cost) * si.quantity), 0) AS profit
+    FROM sale_items si JOIN sales s ON s.id = si.sale_id
+    WHERE $sPeriodFilter
+      AND s.payment_status='paid'
+")->fetch();
+
+// Inventory report (raw materials, valued at actual cost)
 $inv = $pdo->query("
     SELECT COUNT(*) AS items,
-           COALESCE(SUM(stock_quantity), 0)          AS units,
-           COALESCE(SUM(stock_quantity * price), 0)  AS stock_value,
+           COALESCE(SUM(stock_quantity), 0)              AS units,
+           COALESCE(SUM(stock_quantity * unit_cost), 0)  AS stock_value,
            COUNT(CASE WHEN stock_quantity <= low_stock_threshold THEN 1 END) AS low
-    FROM products WHERE is_active = TRUE
+    FROM inventory_items WHERE is_active = TRUE
 ")->fetch();
 
 // Individual sales list (used when $view === 'sales')
@@ -130,6 +138,11 @@ require __DIR__ . '/../includes/header.php';
     <div class="label"><span class="material-symbols-outlined">schedule</span> <?= $label ?> · Pending</div>
     <div class="value"><?= money($sum['pending_total']) ?></div>
     <div class="hint"><?= (int) $sum['pending_count'] ?> awaiting payment</div>
+  </div>
+  <div class="card stat">
+    <div class="label"><span class="material-symbols-outlined">trending_up</span> <?= $label ?> · Profit (paid)</div>
+    <div class="value"><?= money($profit['profit']) ?></div>
+    <div class="hint">revenue − ingredient cost</div>
   </div>
   <div class="card stat">
     <div class="label"><span class="material-symbols-outlined">inventory_2</span> Stock Value</div>
