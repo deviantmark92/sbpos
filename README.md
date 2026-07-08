@@ -1,7 +1,6 @@
 # small business POS System (sbPOS)
 
-A simple, mobile-friendly **web-based Point of Sale** for a home-based fried chicken
-business. Tracks daily sales, manages a photo menu, monitors raw-material inventory,
+A simple, mobile-friendly **web-based Point of Sale** created for home-based food business. Tracks daily sales, manages a photo menu, monitors raw-material inventory,
 flags low stock and pending payments, and produces daily / monthly / yearly reports
 including profit derived from ingredient costs.
 
