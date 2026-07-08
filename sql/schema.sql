@@ -99,6 +99,7 @@ CREATE TABLE sales (
     payment_status VARCHAR(20)   NOT NULL DEFAULT 'pending'
                    CHECK (payment_status IN ('paid', 'pending')),
     note           TEXT,
+    prep_minutes   INT           NOT NULL DEFAULT 20 CHECK (prep_minutes > 0),  -- order prep/ready timer (minutes from created_at)
     created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     paid_at        TIMESTAMP     NULL DEFAULT NULL,
     CONSTRAINT fk_sales_cashier FOREIGN KEY (cashier_id) REFERENCES users(id) ON DELETE SET NULL

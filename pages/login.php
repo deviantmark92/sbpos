@@ -24,6 +24,7 @@ $pageTitle = 'Sign in';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sign in · <?= e($cfg['app_name']) ?></title>
+<link rel="icon" href="<?= e(app_logo_url()) ?>">
 <script type="importmap">
 { "imports": { "@material/web/": "https://esm.run/@material/web/" } }
 </script>
@@ -35,40 +36,14 @@ $pageTitle = 'Sign in';
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
 <link rel="stylesheet" href="assets/app.css">
+<?= theme_style_tag() ?>
 </head>
 <body>
 <div class="login-wrap">
   <div class="card login-card">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="50" height="50" class="logo" aria-hidden="true">
-      <!-- tail feathers -->
-      <path d="M74,44 Q88,28 90,40 Q83,46 75,50 Z" fill="#b05a00"/>
-      <path d="M75,52 Q92,44 91,57 Q84,59 75,57 Z" fill="#c06810"/>
-      <!-- body -->
-      <ellipse cx="48" cy="65" rx="28" ry="22" fill="currentColor"/>
-      <!-- wing -->
-      <ellipse cx="44" cy="68" rx="18" ry="11" fill="#6b2c00"/>
-      <!-- neck -->
-      <ellipse cx="24" cy="51" rx="10" ry="14" fill="currentColor"/>
-      <!-- head -->
-      <circle cx="22" cy="34" r="15" fill="currentColor"/>
-      <!-- comb -->
-      <path d="M15,21 Q17,12 20,20 Q22,12 25,20 Q27,12 30,21" fill="#d63b2f"/>
-      <!-- wattle -->
-      <ellipse cx="13" cy="41" rx="5" ry="7" fill="#d63b2f"/>
-      <!-- beak -->
-      <path d="M5,33 L18,30 L18,37 Z" fill="#e8a020"/>
-      <!-- eye -->
-      <circle cx="24" cy="30" r="4" fill="#1a0800"/>
-      <circle cx="23" cy="29" r="1.5" fill="white"/>
-      <!-- legs -->
-      <rect x="38" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
-      <rect x="52" y="85" width="6" height="9" rx="3" fill="#e8a020"/>
-      <!-- feet -->
-      <path d="M35,94 L47,94 M41,94 L41,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
-      <path d="M49,94 L61,94 M55,94 L55,98" stroke="#e8a020" stroke-width="3" stroke-linecap="round"/>
-    </svg>
+    <img class="logo" src="<?= e(app_logo_url()) ?>" alt="<?= e($cfg['app_name']) ?> logo">
     <h2><?= e($cfg['app_name']) ?></h2>
-    <p class="muted">Point of Sale &mdash; sign in to continue</p>
+    <p class="muted tagline"><?= e($cfg['app_tagline'] ?? 'sign in to continue') ?></p>
 
     <?php if ($error): ?>
       <div class="flash flash-error" style="justify-content:center">

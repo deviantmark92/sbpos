@@ -31,6 +31,129 @@ function suggest_price(float $cost, string $mode, float $markup): ?float
     };
 }
 
+/**
+ * Absolute path of the custom (owner-uploaded) logo file, or null when the
+ * app is using the built-in default logo.
+ */
+function app_logo_file(): ?string
+{
+    foreach (['png', 'jpg', 'jpeg', 'webp', 'gif'] as $ext) {
+        $file = config()['upload_dir'] . '/logo.' . $ext;
+        if (is_file($file)) {
+            return $file;
+        }
+    }
+    return null;
+}
+
+/** URL of the app logo: the owner-uploaded one if set, else the default sbPOS mark. */
+function app_logo_url(): string
+{
+    $file = app_logo_file();
+    if ($file !== null) {
+        return config()['upload_url'] . '/' . basename($file) . '?v=' . filemtime($file);
+    }
+    return 'assets/logo-default.svg';
+}
+
+/* ---------------- App settings (file-backed, no DB) ---------------- */
+
+/** Path of the JSON file that stores owner-configurable settings. */
+function app_settings_file(): string
+{
+    return config()['upload_dir'] . '/app-settings.json';
+}
+
+/** All stored settings as an associative array (cached for the request). */
+function app_settings(): array
+{
+    static $s = null;
+    if ($s !== null) {
+        return $s;
+    }
+    $f = app_settings_file();
+    $s = is_file($f) ? (json_decode((string) file_get_contents($f), true) ?: []) : [];
+    return $s;
+}
+
+/** Read a single setting with a default. */
+function app_setting(string $key, $default = null)
+{
+    return app_settings()[$key] ?? $default;
+}
+
+/** Persist a single setting. Returns false if the file could not be written. */
+function save_app_setting(string $key, $value): bool
+{
+    $dir = config()['upload_dir'];
+    if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+    $s = app_settings();
+    $s[$key] = $value;
+    return @file_put_contents(app_settings_file(), json_encode($s, JSON_PRETTY_PRINT)) !== false;
+}
+
+/* ---------------- Color schemes (theming) ---------------- */
+
+/**
+ * Available color schemes. Each overrides the primary/brand color family and
+ * the warm surface tints so the whole app re-themes from one choice.
+ */
+function color_themes(): array
+{
+    return [
+        'brown'  => ['label' => 'Broasted Brown', 'primary' => '#8b3a00', 'dark' => '#5e2700',
+                     'container' => '#ffdcc2', 'onContainer' => '#311300', 'secondary' => '#b8531f',
+                     'surface' => '#fff8f4', 'surfaceVariant' => '#f3e0d4', 'bg' => '#fbf5f0', 'line' => '#ecdfd6'],
+        'blue'   => ['label' => 'Ocean Blue', 'primary' => '#0b5ba6', 'dark' => '#073e73',
+                     'container' => '#cfe4ff', 'onContainer' => '#001d36', 'secondary' => '#1f6fb8',
+                     'surface' => '#f5f9ff', 'surfaceVariant' => '#dbe7f3', 'bg' => '#f0f5fb', 'line' => '#d8e4f0'],
+        'green'  => ['label' => 'Forest Green', 'primary' => '#1f6d3b', 'dark' => '#124a27',
+                     'container' => '#c8ecd2', 'onContainer' => '#002110', 'secondary' => '#37814f',
+                     'surface' => '#f5fbf6', 'surfaceVariant' => '#dcecdf', 'bg' => '#f0f8f2', 'line' => '#d8ebdd'],
+        'teal'   => ['label' => 'Teal', 'primary' => '#00695c', 'dark' => '#003f39',
+                     'container' => '#bdeee5', 'onContainer' => '#00201c', 'secondary' => '#2a8378',
+                     'surface' => '#f4fbf9', 'surfaceVariant' => '#d5e8e4', 'bg' => '#eef7f5', 'line' => '#d3e6e2'],
+        'purple' => ['label' => 'Royal Purple', 'primary' => '#5b3aa6', 'dark' => '#3e2673',
+                     'container' => '#e5dbff', 'onContainer' => '#1d0060', 'secondary' => '#6f4fb8',
+                     'surface' => '#f9f6ff', 'surfaceVariant' => '#e6ddf3', 'bg' => '#f4f0fb', 'line' => '#e2d8f0'],
+        'crimson' => ['label' => 'Crimson Red', 'primary' => '#b3261e', 'dark' => '#7a1712',
+                     'container' => '#ffdad6', 'onContainer' => '#410002', 'secondary' => '#c34b3f',
+                     'surface' => '#fff7f6', 'surfaceVariant' => '#f3dcd9', 'bg' => '#fbf1f0', 'line' => '#f0ddda'],
+        'slate'  => ['label' => 'Slate Gray', 'primary' => '#37474f', 'dark' => '#22303a',
+                     'container' => '#d3dee4', 'onContainer' => '#101f27', 'secondary' => '#546e7a',
+                     'surface' => '#f7f9fa', 'surfaceVariant' => '#dde4e8', 'bg' => '#f1f4f6', 'line' => '#dde3e7'],
+    ];
+}
+
+/** The active color-scheme key, falling back to the default when unset/invalid. */
+function app_theme_key(): string
+{
+    $k = (string) app_setting('theme', 'slate');
+    return isset(color_themes()[$k]) ? $k : 'slate';
+}
+
+/** A <style> block that overrides the CSS variables for the active color scheme. */
+function theme_style_tag(): string
+{
+    $t = color_themes()[app_theme_key()];
+    $vars = [
+        '--md-sys-color-primary'              => $t['primary'],
+        '--md-sys-color-primary-container'    => $t['container'],
+        '--md-sys-color-on-primary-container' => $t['onContainer'],
+        '--md-sys-color-secondary'            => $t['secondary'],
+        '--md-sys-color-surface'              => $t['surface'],
+        '--md-sys-color-surface-variant'      => $t['surfaceVariant'],
+        '--brown'                             => $t['primary'],
+        '--brown-d'                           => $t['dark'],
+        '--bg'                                => $t['bg'],
+        '--line'                              => $t['line'],
+    ];
+    $css = ':root{';
+    foreach ($vars as $k => $v) { $css .= $k . ':' . $v . ';'; }
+    $css .= '}';
+    return '<style id="theme-vars">' . $css . '</style>';
+}
+
 /** Build a URL to a page within the front controller. */
 function url(string $page, array $params = []): string
 {

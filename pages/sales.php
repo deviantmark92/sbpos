@@ -11,6 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $customer = trim((string) input('customer_name')) ?: 'Walk-in';
     $status   = input('payment_status') === 'paid' ? 'paid' : 'pending';
     $note     = trim((string) input('note'));
+    // Order prep/progress timer in minutes. Defaults to 20; clamp to a sane range.
+    $prepMinutes = (int) input('prep_minutes', 20);
+    if ($prepMinutes < 1)   { $prepMinutes = 1; }
+    if ($prepMinutes > 1440) { $prepMinutes = 1440; }
 
     $menuIds    = $_POST['menu_item_id'] ?? [];
     $quantities = $_POST['qty'] ?? [];
@@ -102,9 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insert sale header
         $paidAt = $status === 'paid' ? date('Y-m-d H:i:s') : null;
-        $stmt = $pdo->prepare('INSERT INTO sales (customer_name, cashier_id, total_amount, payment_status, note, paid_at)
-                               VALUES (?,?,?,?,?,?)');
-        $stmt->execute([$customer, $user['id'], $total, $status, $note ?: null, $paidAt]);
+        $stmt = $pdo->prepare('INSERT INTO sales (customer_name, cashier_id, total_amount, payment_status, note, prep_minutes, paid_at)
+                               VALUES (?,?,?,?,?,?,?)');
+        $stmt->execute([$customer, $user['id'], $total, $status, $note ?: null, $prepMinutes, $paidAt]);
         $saleId = (int) $pdo->lastInsertId();
 
         // Insert line items
@@ -189,6 +193,19 @@ require __DIR__ . '/../includes/header.php';
         <label><input type="radio" name="payment_status" value="pending"> Pending</label>
       </div>
 
+      <div class="prep-timer" style="margin-top:14px">
+        <label class="hint" for="prepMinutes">Prep timer (minutes)</label>
+        <div class="prep-presets">
+          <md-outlined-text-field id="prepMinutes" name="prep_minutes" type="number"
+            value="20" min="1" max="1440" step="1" style="width:120px"></md-outlined-text-field>
+          <button type="button" class="prep-chip" data-prep="10">10m</button>
+          <button type="button" class="prep-chip" data-prep="20">20m</button>
+          <button type="button" class="prep-chip" data-prep="30">30m</button>
+          <button type="button" class="prep-chip" data-prep="45">45m</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0">Order will be marked ready after this time. Default is 20 minutes.</p>
+      </div>
+
       <md-outlined-text-field label="Note (optional)" name="note" type="textarea" rows="2" style="margin-top:12px;width:100%"></md-outlined-text-field>
 
       <div id="hiddenInputs"></div>
@@ -257,6 +274,11 @@ document.getElementById('cartList').addEventListener('click', e => {
   else if (t.dataset.rm){ cart.delete(t.dataset.rm); }
   render();
 });
+
+// Prep-timer preset chips
+document.querySelectorAll('.prep-chip').forEach(c => c.addEventListener('click', () => {
+  document.getElementById('prepMinutes').value = c.dataset.prep;
+}));
 
 document.getElementById('recordBtn').addEventListener('click', () => {
   if (cart.size === 0){ alert('Add at least one item first.'); return; }

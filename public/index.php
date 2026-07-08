@@ -23,6 +23,7 @@ $routes = [
     'inventory' => 'inventory.php',
     'reports'   => 'reports.php',
     'users'     => 'users.php',
+    'settings'  => 'settings.php',
 ];
 
 $page = $_GET['page'] ?? (is_logged_in() ? 'dashboard' : 'login');

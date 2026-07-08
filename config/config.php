@@ -17,7 +17,8 @@ return [
     ],
 
     // ---- App ----
-    'app_name'        => 'Broasted Chicken POS',
+    'app_name'        => 'sbPOS',
+    'app_tagline'     => 'small business point of sale',
     'currency_symbol' => '₱',          // Philippine Peso
     'currency_code'   => 'PHP',
 

@@ -49,6 +49,23 @@ require __DIR__ . '/../includes/header.php';
     </div>
   </div>
 
+  <?php
+    $startTs = strtotime($sale['created_at']);
+    $prepMin = (int) ($sale['prep_minutes'] ?? 20);
+    $readyTs = $startTs + $prepMin * 60;
+  ?>
+  <div class="order-timer" id="orderTimer"
+       data-start="<?= $startTs ?>" data-ready="<?= $readyTs ?>">
+    <div class="order-timer-head">
+      <span class="material-symbols-outlined">timer</span>
+      <span class="ot-label">Order progress</span>
+      <span class="spacer"></span>
+      <strong class="ot-remaining">—</strong>
+    </div>
+    <div class="ot-bar"><div class="ot-fill"></div></div>
+    <div class="hint ot-sub">Ready by <?= e(date('g:ia', $readyTs)) ?> · <?= $prepMin ?> min prep</div>
+  </div>
+
   <div class="table-wrap" style="border:none">
     <table class="data" style="min-width:0">
       <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Subtotal</th></tr></thead>

@@ -14,7 +14,7 @@ $today = $pdo->query("
 
 // Pending payments
 $pending = $pdo->query("
-    SELECT s.id, s.customer_name, s.total_amount, s.created_at, u.full_name AS cashier
+    SELECT s.id, s.customer_name, s.total_amount, s.created_at, s.prep_minutes, u.full_name AS cashier
     FROM sales s LEFT JOIN users u ON u.id = s.cashier_id
     WHERE s.payment_status='pending'
     ORDER BY s.created_at DESC
@@ -76,9 +76,21 @@ require __DIR__ . '/../includes/header.php';
         <table class="data" style="min-width:0">
           <thead><tr><th>Customer</th><th class="num">Amount</th><th></th></tr></thead>
           <tbody>
-          <?php foreach ($pending as $p): ?>
+          <?php foreach ($pending as $p):
+            $startTs = strtotime($p['created_at']);
+            $readyTs = $startTs + (int) ($p['prep_minutes'] ?? 20) * 60;
+          ?>
             <tr>
-              <td><?= e($p['customer_name']) ?><br><small class="muted"><?= e(date('M j, g:ia', strtotime($p['created_at']))) ?></small></td>
+              <td>
+                <?= e($p['customer_name']) ?><br><small class="muted"><?= e(date('M j, g:ia', $startTs)) ?></small>
+                <div class="order-timer mini" data-start="<?= $startTs ?>" data-ready="<?= $readyTs ?>">
+                  <div class="order-timer-head">
+                    <span class="material-symbols-outlined">timer</span>
+                    <span class="ot-remaining">—</span>
+                  </div>
+                  <div class="ot-bar"><div class="ot-fill"></div></div>
+                </div>
+              </td>
               <td class="num"><span class="badge pending"><?= money($p['total_amount']) ?></span></td>
               <td><a class="plain" href="<?= e(url('sale_view', ['id' => $p['id']])) ?>">View</a></td>
             </tr>
